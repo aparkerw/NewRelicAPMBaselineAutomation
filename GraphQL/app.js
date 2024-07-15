@@ -23,6 +23,7 @@ const main = async () => {
     // create a baseline dashboard if one does not already exist
     try {
       let dashboardId = await DashboardService.createDashbaordForAPM(nr_account_id, nr_app_name, nr_entity_guid);
+      console.log(`created dashboard, ${dashboardId}`)
     } catch (e) {
       console.warn("creating the baseline dashboard was not successful", e.message)
     }

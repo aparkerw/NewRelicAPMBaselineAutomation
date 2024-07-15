@@ -26,9 +26,9 @@ const setupBaselineAlerting = async (accountId, email, apmName, apmGuid) => {
   console.log("channelId", channelId);
   let policyId = await createAlertPolicy(accountId, apmName);
   console.log("policyId", policyId);
-  let conditionId = await createAlertCondition(accountId, apmName, apmGuid, policyId);
-  console.log("conditionId", conditionId);
-  let workflowId = await createWorkflow(accountId, channelId, conditionId, policyId, apmName, apmGuid);
+  let conditionIds = await createAlertConditions(accountId, apmName, apmGuid, policyId);
+  console.log("conditionIds", conditionIds.join(', '));
+  let workflowId = await createWorkflow(accountId, channelId, policyId, apmName, apmGuid);
   console.log("workflowId", workflowId);
 }
 
@@ -204,7 +204,7 @@ const createAlertPolicy = async (accountId, apmName) => {
   // check for existing policies
   let policyId = await checkForExistingAlertPolicy(accountId, apmName)
 
-  if(policyId){
+  if (policyId) {
     console.log('skipping policy creation because matching policy already exists:', policyId);
   } else {
     console.log(`creating new policy for '${apmName}'`);
@@ -231,7 +231,8 @@ const createAlertPolicy = async (accountId, apmName) => {
  */
 const checkForExistingAlertPolicy = async (accountId, apmName) => {
 
-  let resp = await NerdGraphService.makeCall({ query: `{
+  let resp = await NerdGraphService.makeCall({
+    query: `{
     actor {
       account(id: ${accountId}) {
         alerts {
@@ -260,61 +261,116 @@ const makeAlertPolicyName = (appName) => {
 
 // TODO: make this more dynamic with each query being processed to make all of the conditions
 // required for the application
-const createAlertCondition = async (accountId, apmName, apmGuid, policyId) => {
+const createAlertConditions = async (accountId, apmName, apmGuid, policyId) => {
 
-  // TODO: make a way for us to have 
-  let graphql = {
-    query: `mutation {
-    alertsNrqlConditionStaticCreate(
-      accountId: ${accountId}
-      policyId: "${policyId}"
-      condition: {
-        name: "Baseline - ${apmName}"
-        enabled: true
-        nrql: {
-          query: "SELECT uniqueCount(host) FROM Transaction WHERE entity.guid='${apmGuid}'"
-        }
-        signal: {
-          aggregationWindow: 60
-          aggregationMethod: EVENT_FLOW
-          aggregationDelay: 120
-        }
-        terms: {
-          threshold: 2
-          thresholdOccurrences: AT_LEAST_ONCE
-          thresholdDuration: 600
-          operator: BELOW
-          priority: CRITICAL
-        }
-        valueFunction: SINGLE_VALUE
-        violationTimeLimitSeconds: 86400
-      }
-    ) {
-      id
-      entityGuid
-      name
+  let conditionIds = [];
+  let alertConditions = [
+    {
+      name: 'hosts check',
+      query: `SELECT uniqueCount(host) FROM Transaction WHERE entity.guid='${apmGuid}'`
+    },
+    {
+      name: 'hosts check 2',
+      query: `SELECT uniqueCount(host) FROM Transaction WHERE entity.guid='${apmGuid}'`
     }
-  }`};
+  ]
+  for (let condition of alertConditions) {
 
-  let resp = await NerdGraphService.makeCall(graphql);
+    // check for an existing condition
+    let existingConditions = await checkForExistingCondition(accountId, apmName, condition.name, condition.query);
 
+    if (existingConditions.length > 0) {
+      console.log("condition being skipped", condition.name, existingConditions.map(c => c.id).join(','));
+    } else {
+      let graphql = {
+        query: `mutation {
+      alertsNrqlConditionStaticCreate(
+        accountId: ${accountId}
+        policyId: "${policyId}"
+        condition: {
+          name: "Baseline - ${apmName} - ${condition.name}"
+          enabled: true
+          nrql: {
+            query: "${condition.query}"
+          }
+          signal: {
+            aggregationWindow: 60
+            aggregationMethod: EVENT_FLOW
+            aggregationDelay: 120
+          }
+          terms: {
+            threshold: 2
+            thresholdOccurrences: AT_LEAST_ONCE
+            thresholdDuration: 600
+            operator: BELOW
+            priority: CRITICAL
+          }
+          valueFunction: SINGLE_VALUE
+          violationTimeLimitSeconds: 86400
+        }
+      ) {
+        id
+        entityGuid
+        name
+      }
+    }`};
 
-  let errors = resp.data.errors || [];
-  if (errors.length > 0) {
-    for (let error of errors) {
-      console.log(error.message);
+      let resp = await NerdGraphService.makeCall(graphql);
+
+      let errors = resp.data.errors || [];
+      if (errors.length > 0) {
+        for (let error of errors) {
+          console.log(error.message);
+        }
+      }
+
+      let conditionId = resp.data.data?.alertsNrqlConditionStaticCreate?.id;
+      let conditionGuid = resp.data.data?.alertsNrqlConditionStaticCreate?.entityGuid;
+
+      await NerdGraphService.addTagsToEntity(conditionGuid, [
+        { key: "BASELINE", values: "true" },
+      ]);
+
+      conditionIds.push(conditionId);
     }
   }
 
-  let conditionId = resp.data.data?.alertsNrqlConditionStaticCreate?.id;
-  let conditionGuid = resp.data.data?.alertsNrqlConditionStaticCreate?.entityGuid;
+  return conditionIds;
 
-  await NerdGraphService.addTagsToEntity(conditionGuid, [
-    { key: "BASELINE", values: "true" },
-  ]);
+}
 
-  return conditionId;
+/**
+ * 
+ */
+const checkForExistingCondition = async (accountId, apmName, conditionName, conditionQuery) => {
 
+  let query = {
+    query: `{
+  actor {
+    account(id: ${accountId}) {
+      alerts {
+        nrqlConditionsSearch(
+          searchCriteria: {name: "Baseline - ${apmName} - ${conditionName}", query: "${conditionQuery}"}
+        ) {
+          nextCursor
+          nrqlConditions {
+            id
+            name
+            nrql {
+              dataAccountId
+              evaluationOffset
+            }
+          }
+        }
+      }
+    }
+  }
+}`};
+  let resp = await NerdGraphService.makeCall(query);
+
+  let conditions = resp.data?.data?.actor?.account?.alerts?.nrqlConditionsSearch?.nrqlConditions || [];
+
+  return conditions;
 }
 
 /**
@@ -322,7 +378,7 @@ const createAlertCondition = async (accountId, apmName, apmGuid, policyId) => {
  * If an existing workflow exists with the BASELINE_AMP_GUID=*** tag matching then we will use 
  * that workflow instead
  */
-const createWorkflow = async (accountId, channelId, conditionId, policyId, apmName, apmGuid) => {
+const createWorkflow = async (accountId, channelId, policyId, apmName, apmGuid) => {
 
   // TODO: check for existing workflow
   let workflowGuid = await checkForExistingWorkflow(apmGuid);
