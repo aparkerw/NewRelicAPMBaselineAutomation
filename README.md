@@ -42,7 +42,7 @@ When the script executes it will create the following artifacts if they do not e
 
 To run this script you will need to have **NodeJS** and **npm**installed on the system.
 
-Update the application dependencies by calling `npm i` from within the `GraphQL` folder.
+Update the application dependencies by calling `npm install` from within the `GraphQL` folder.
 
 You can either create the `.env` file as described below, or copy the `.env.template` file and add your credentials or you can define the environment vairables in the shell or inline (see examples below).
 
@@ -52,12 +52,13 @@ with a `.env` file
 
 ```
 cd GraphQL
+npm install
 node app.js
 ```
 
 ```
 cd GraphQL
-npm i
+npm install
 export NR_API_KEY="NRAK-L*******************5"
 export NR_APP_NAME="Account Management Service"
 export NR_ACCOUNT_ID="1234567"
@@ -68,6 +69,7 @@ or inline
 
 ```
 cd GraphQL
+npm install
 NR_API_KEY="NRAK-L*******************5" NR_APP_NAME="Account Management Service" NR_ACCOUNT_ID="1234567" NR_ALERT_EMAIL="your_email@email.com" node app.js
 ```
 
