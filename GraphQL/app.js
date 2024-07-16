@@ -16,7 +16,7 @@ const main = async () => {
   // console.log(accounts);
 
   // get application information from new relic
-  let nr_entity_guid = await NerdGraphService.getEntityGuidFromName(nr_app_name, 'APPLICATION');
+  let nr_entity_guid = await NerdGraphService.getEntityGuidFromName(nr_app_name, nr_account_id, 'APPLICATION');
 
 
   if (nr_account_id && nr_app_name && nr_entity_guid) {

@@ -433,6 +433,7 @@ const createWorkflow = async (accountId, channelId, policyId, apmName, apmGuid) 
     workflowGuid = resp.data.data?.aiWorkflowsCreateWorkflow?.workflow?.guid;
 
     // only upon creation of a new workflow will we tag the original APM entity
+    let d = new Date();
     await NerdGraphService.addTagsToEntity(apmGuid, [
       {key: "BASELINE_WORKFLOW_CREATED", values: `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`},
       {key: "BASELINE_WORKFLOW_GUID", values: `${workflowGuid}`}

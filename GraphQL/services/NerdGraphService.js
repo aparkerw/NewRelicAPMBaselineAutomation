@@ -18,12 +18,12 @@ const getAccounts = async () => {
   return resp?.data?.data?.actor?.accounts;
 }
 
-const getEntityGuidFromName = async (entityName, type) => {
+const getEntityGuidFromName = async (entityName, accountId, type) => {
   // entitySearch(queryBuilder: {name: "${entityName}" ${type ? `, type: ${type}` : ''}}) {
-  let entities = await getEntitiesFromQuery(`name = '${entityName}'`)
+  let entities = await getEntitiesFromQuery(`name = '${entityName}' and accountId = ${accountId}`)
 
   if(entities.length > 1) {
-    throw Error("There are too many entities with that name.");
+    throw Error(`There are too many entities with that name. ${entities.map(e => e.guid).join(', ')}`);
   } else if(!entities || entities.length === 0) {
     throw Error("Entities with that name could not be found.");
   }
