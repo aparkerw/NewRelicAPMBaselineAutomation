@@ -19,6 +19,7 @@ const setupBaselineAlerting = async (accountId, email, apmName, apmGuid) => {
   // 3 find/create conditions
   // 4 find/create policy
   // 5 find/create workflow
+  // 6 tag the entity with new workflow
 
 
   let [destinationId, channelId] = await createDestinationAndChannel(accountId, email);
@@ -429,9 +430,13 @@ const createWorkflow = async (accountId, channelId, policyId, apmName, apmGuid) 
       }
     }
 
-
-
     workflowGuid = resp.data.data?.aiWorkflowsCreateWorkflow?.workflow?.guid;
+
+    // only upon creation of a new workflow will we tag the original APM entity
+    await NerdGraphService.addTagsToEntity(apmGuid, [
+      {key: "BASELINE_WORKFLOW_CREATED", values: `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`},
+      {key: "BASELINE_WORKFLOW_GUID", values: `${workflowGuid}`}
+   ])
 
     // Add tags to enrich the workflow for easy management
     await NerdGraphService.addTagsToEntity(workflowGuid, [
