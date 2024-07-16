@@ -2,7 +2,7 @@
 
 ## Overview
 
-The purpose of this project is to provide a standard implementation for alerts and dashboard creation.
+The purpose of this project is to provide a standard implementation for the creation of alerts, dashboards, and other governance resources/attributes.
 
 Executing this script for each APM instance in your account will ensure that any standardized alerting and dashboard governance policies are applied.
 
@@ -23,7 +23,7 @@ Likewise the APM entity that this is executed upon will have the following tags 
 
 Graphql is the most flexible option for creating resources withing New Relic and it allows us to fully control the logic for handling existing resources.
 
-The **Node JS** script in `app.js` will use the provided environment variables to then lookup and create the additional alerting and dashboard resources.
+The **NodeJS** script in `app.js` will use the provided environment variables to then lookup and create the additional alerting and dashboard resources.
 
 #### Results
 
@@ -36,16 +36,52 @@ When the script executes it will create the following artifacts if they do not e
 - Alerts: alert condition(s) that will be added to the policy
 - Alerts: alert workflow that links the channel and the alert policy
 
+
+
 ### Running the script
+
+To run this script you will need to have **NodeJS** and **npm**installed on the system.
+
+Update the application dependencies by calling `npm i` from within the `GraphQL` folder.
+
+You can either create the `.env` file as described below, or copy the `.env.template` file and add your credentials or you can define the environment vairables in the shell or inline (see examples below).
+
+Once installed you can run the following command from the `GraphQL` directory:
+
+with a `.env` file
+
+```
+cd GraphQL
+node app.js
+```
+
+```
+cd GraphQL
+npm i
+export NR_API_KEY="NRAK-L*******************5"
+export NR_APP_NAME="Account Management Service"
+export NR_ACCOUNT_ID="1234567"
+export NR_ALERT_EMAIL="your_email@email.com"
+node app.js
+```
+or inline
+
+```
+cd GraphQL
+NR_API_KEY="NRAK-L*******************5" NR_APP_NAME="Account Management Service" NR_ACCOUNT_ID="1234567" NR_ALERT_EMAIL="your_email@email.com" node app.js
+```
+
+
+
 
 #### Inputs
 
 To properly run the script you will need to provide the following information either in a `.env` file or as an `Envoronment Variable`
 
-- **API Key**
-- **APM Name**
-- **New Relic Account ID**
-- **Alert Email Address**
+- **New Relic Account ID** - the account to create dashboards and alerts in
+- **API Key** - requried for retrieving and creating resources in your account
+- **APM Name** - the name of the application to be monitored, this is likely already in your APM configuratin files
+- **Alert Email Address** - the email address that is the destination for receiving alert messages
 
 *example `.env`file*
 ```
@@ -54,6 +90,10 @@ NR_APP_NAME="Account Management Service"
 NR_ACCOUNT_ID="1234567"
 NR_ALERT_EMAIL="your_email@email.com"
 ```
+
+Additionally, to meet your specific requirements, the dashboard content/layout can be adjusted by modifying the `createDashboard()` method in `GraphQL/services/DashboardService.js`.  You can add new pages or widgets and you can update the NRQL queries to meet your needs.
+
+For alerts customization.  You can update the policy's alerting logic in 
 
 #### Outputs
 
@@ -78,4 +118,19 @@ workflowId MzkxNDk2MnxBS***TcwMC1hNTFhNTllY2YyYzM
 
 #### Logic
 
+The basics of the logia are as follows:
+1. look up the entity GUID from the APM name (abort if the match is not exactly 1 entity)
+1. check for existing dashboard (tags + name), create if missing with queries pointing to the entity GUID retrieved earlier
+1. check for destination (name + email), create if missing using provided email
+1. check for channel, create if missing
+1. check for alert policy (tags + name), create if missing
+1. check for alert conditions (name + query), create if missing and add to policy
+1. check for workflow (tags + name), create if missing and attach channel and policy
+
+
+
 ## Terraform
+
+### Description
+
+Terraform can be another solution for codifying this work and it will be expanded and explained further in future updates.
